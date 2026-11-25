@@ -1,0 +1,68 @@
+name: macOS FFmpeg
+
+on:
+  pull_request:
+    paths:
+      - 'macos/**'
+      - '.github/workflows/macos-ffmpeg.yml'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Release tag that gets the archives (empty builds them only)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: macos-15
+          - arch: x86_64
+            os: macos-15-intel
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install build tools
+        run: brew install nasm pkgconf
+
+      - name: Build
+        run: bash macos/build-ffmpeg.sh "${{ matrix.arch }}" dist
+
+      - name: Upload archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ffmpeg-macos-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    if: github.event_name == 'workflow_dispatch' && inputs.release != ''
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ffmpeg-macos-*
+          merge-multiple: true
+          path: dist
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ inputs.release }}
+        run: gh release upload "$RELEASE" dist/*.tar.xz dist/*.sha256 --repo "$GITHUB_REPOSITORY"
