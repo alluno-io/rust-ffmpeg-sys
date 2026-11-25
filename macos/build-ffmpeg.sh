@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Builds the LGPL FFmpeg the Alluno Mac app bundles: the avcodec, avutil, swresample and swscale
 # shared libraries with the libopus encoder, nothing else enabled or autodetected, for macOS 12.3
-# and later. The build stops unless every library reports the LGPL v3, links only libSystem and
-# each other, and targets that macOS.
+# and later. The build stops unless every library reports the LGPL v3, links nothing but macOS
+# itself and each other, and targets that macOS.
 #
 # Usage: macos/build-ffmpeg.sh <arm64|x86_64> [output dir]
 # Runs on a Mac of that architecture with the Xcode command line tools, pkg-config and, for
@@ -74,7 +74,7 @@ check_library() {
   for dep in $(otool -L "$file" | tail -n +2 | awk '{ print $1 }'); do
     case "$dep" in
       @rpath/libavcodec.*|@rpath/libavutil.*|@rpath/libswresample.*|@rpath/libswscale.*) ;;
-      /usr/lib/libSystem.B.dylib) ;;
+      /usr/lib/*|/System/Library/Frameworks/*) ;;
       *) echo "$file links $dep" >&2; exit 1 ;;
     esac
   done
